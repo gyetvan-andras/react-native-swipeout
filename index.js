@@ -22,6 +22,8 @@ const SwipeoutBtn = React.createClass({
     color: PropTypes.string,
     component: PropTypes.node,
     onPress: PropTypes.func,
+    onPressIn: PropTypes.func,
+    onPressOut: PropTypes.func,
     text: PropTypes.string,
     type: PropTypes.string,
     underlayColor: PropTypes.string,
@@ -36,6 +38,8 @@ const SwipeoutBtn = React.createClass({
       height: 0,
       key: null,
       onPress: null,
+      onPressIn: null,
+      onPressOut: null,
       disabled: false,
       text: 'Click me',
       type: '',
@@ -72,11 +76,13 @@ const SwipeoutBtn = React.createClass({
     var styleSwipeoutBtnText = [styles.swipeoutBtnText];
 
     //  apply text color
-    if (btn.color) styleSwipeoutBtnText.push([{ color: btn.color }]);
+    if (btn.color) styleSwipeoutBtnText.push([{ width: this.props.width || 100, color: btn.color }]);
 
     return  (
       <NativeButton
         onPress={this.props.onPress}
+        onPressIn={this.props.onPressIn}
+        onPressOut={this.props.onPressOut}
         style={styles.swipeoutBtnTouchable}
         underlayColor={this.props.underlayColor}
         disabled={this.props.disabled}
@@ -107,6 +113,7 @@ const Swipeout = React.createClass({
     scroll: PropTypes.func,
     style: View.propTypes.style,
     sensitivity: PropTypes.number,
+    buttonWidth: PropTypes.number,
   },
 
   getDefaultProps: function() {
@@ -152,14 +159,17 @@ const Swipeout = React.createClass({
   },
 
   _handlePanResponderGrant: function(e: Object, gestureState: Object) {
-    if(this.props.onOpen){
+    var onPressIn = this.props.onPressIn;
+    if (onPressIn) onPressIn();
+    if (this.props.onOpen) {
       this.props.onOpen(this.props.sectionID, this.props.rowID);
     }
     this.refs.swipeoutContent.measure((ox, oy, width, height) => {
+      let buttonWidth = this.props.buttonWidth || (width/5);
       this.setState({
-        btnWidth: (width/5),
-        btnsLeftWidth: this.props.left ? (width/5)*this.props.left.length : 0,
-        btnsRightWidth: this.props.right ? (width/5)*this.props.right.length : 0,
+        btnWidth: buttonWidth,
+        btnsLeftWidth: this.props.left ? buttonWidth*this.props.left.length : 0,
+        btnsRightWidth: this.props.right ? buttonWidth*this.props.right.length : 0,
         swiping: true,
         timeStart: (new Date()).getTime(),
       });
@@ -174,7 +184,7 @@ const Swipeout = React.createClass({
     if (this.state.openedRight) var posX = gestureState.dx - rightWidth;
     else if (this.state.openedLeft) var posX = gestureState.dx + leftWidth;
 
-    //  prevent scroll if moveX is true
+    // prevent scroll if moveX is true
     var moveX = Math.abs(posX) > Math.abs(posY);
     if (this.props.scroll) {
       if (moveX) this.props.scroll(false);
@@ -189,10 +199,12 @@ const Swipeout = React.createClass({
 
   _handlePanResponderEnd: function(e: Object, gestureState: Object) {
     var posX = gestureState.dx;
+    var posY = gestureState.dy
     var contentPos = this.state.contentPos;
     var contentWidth = this.state.contentWidth;
     var btnsLeftWidth = this.state.btnsLeftWidth;
     var btnsRightWidth = this.state.btnsRightWidth;
+    var onPressOut = this.props.onPressOut;
 
     //  minimum threshold to open swipeout
     var openX = contentWidth*0.33;
@@ -213,6 +225,11 @@ const Swipeout = React.createClass({
     }
 
     if (this.state.swiping) {
+      if (!this.state.openedRight && !this.state.openedLeft && posX == 0 && posY == 0) {
+        var onPress = this.props.onPress;
+        if (onPress) onPress();
+      }
+
       if (openRight && contentPos < 0 && posX < 0) {
         // open swipeout right
         this._tweenContent('contentPos', -btnsRightWidth);
@@ -231,6 +248,7 @@ const Swipeout = React.createClass({
 
     //  Allow scroll
     if (this.props.scroll) this.props.scroll(true);
+    if (onPressOut) onPressOut();
   },
 
   _tweenContent: function(state, endValue) {
